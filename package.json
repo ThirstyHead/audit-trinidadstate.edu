@@ -1,0 +1,25 @@
+{
+  "name": "audit-trinidadstate.edu",
+  "version": "1.0.0",
+  "description": "Audit the college site named in college.json for WCAG 2.1 AA compliance",
+  "main": "index.js",
+  "scripts": {
+    "audit": "node audit/axe-audit.mjs",
+    "test": "node audit/axe-audit.mjs",
+    "site:build": "node site/build-site.mjs",
+    "discover": "node audit/discover-pages.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ThirstyHead/audit-trinidadstate.edu.git"
+  },
+  "author": "Scott Davis <scott@thirstyhead.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "playwright": "^1.62.1"
+  },
+  "dependencies": {
+    "axe-html-reporter": "^2.2.11"
+  }
+}

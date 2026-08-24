@@ -1,0 +1,5 @@
+node_modules/
+audit/reports/*
+!audit/reports/.gitkeep
+.DS_Store
+*.log

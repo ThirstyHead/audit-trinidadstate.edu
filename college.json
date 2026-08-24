@@ -1,0 +1,10 @@
+{
+  "name": "Trinidad State College",
+  "slug": "trinidadstate",
+  "domain": "trinidadstate.edu",
+  "baseUrl": "https://trinidadstate.edu",
+  "toolingRepo": "audit-trinidadstate.edu",
+  "resultsRepo": "tsc-audit",
+  "siteName": "Trinidad State College",
+  "canonicalSiteUrl": "https://thirstyhead.com/tsc-audit/"
+}

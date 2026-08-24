@@ -1,0 +1,89 @@
+name: Weekly WCAG audit
+
+on:
+  schedule:
+    # Mondays 06:00 UTC (~midnight/1am MDT, depending on DST)
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  # The publish step pushes to a SIBLING results repo (same org). The default
+  # GITHUB_TOKEN is scoped to this repo only and 403s on cross-repo pushes,
+  # so the workflow uses the RESULTS_TOKEN repository secret — a token
+  # (e.g. a fine-grained PAT with Contents: read/write) that can write to
+  # the results repo. Set it per tooling repo.
+  contents: write
+
+concurrency:
+  group: weekly-audit
+  cancel-in-progress: false
+
+jobs:
+  audit-and-publish:
+    name: Audit & publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out audit tooling
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run WCAG 2.1 AA audit
+        run: npm test
+
+      - name: Publish results to the results repo
+        env:
+          RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Results repo + site URL come from college.json (per-college instance)
+          RESULTS_SHORT="$(node -p "require('./college.json').resultsRepo")"
+          RESULTS_REPO="ThirstyHead/${RESULTS_SHORT}"
+          echo "Publishing to ${RESULTS_REPO}"
+          # The default GITHUB_TOKEN is scoped to THIS repo only and cannot push
+          # cross-repo (it 403s). RESULTS_TOKEN must be a token that can write to
+          # the results repo (e.g. a fine-grained PAT with Contents: read/write).
+          if [ -z "${RESULTS_TOKEN}" ]; then
+            echo "::error::Set the RESULTS_TOKEN secret (a token that can write to ${RESULTS_REPO})."
+            exit 1
+          fi
+
+          RESULTS_DIR="${RUNNER_TEMP}/${RESULTS_SHORT}"
+          git clone "https://x-access-token:${RESULTS_TOKEN}@github.com/${RESULTS_REPO}.git" "${RESULTS_DIR}"
+
+          # Newest report produced by this run
+          REPORT="$(ls -t audit/reports/axe-*.json | head -n 1)"
+          echo "Publishing $(basename "${REPORT}")"
+          mkdir -p "${RESULTS_DIR}/reports"
+          cp "${REPORT}" "${RESULTS_DIR}/reports/$(basename "${REPORT}")"
+
+          # Render the Pages site into the results repo's docs/
+          node site/build-site.mjs \
+            --report "${REPORT}" \
+            --history-dir "${RESULTS_DIR}/reports" \
+            --out "${RESULTS_DIR}/docs" \
+            --pages-dir "${REPORT%/*}/pages" \
+            --raw-base "https://github.com/${RESULTS_REPO}/blob/main/reports"
+
+          cd "${RESULTS_DIR}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "audit: weekly run $(date -u +%Y-%m-%d)"
+            git push origin HEAD:main
+          fi
+          SITE_URL="$(node -p "require('./college.json').canonicalSiteUrl")"
+          echo "Site: ${SITE_URL}"

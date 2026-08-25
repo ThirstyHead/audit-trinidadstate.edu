@@ -46,8 +46,12 @@ jobs:
           RESULTS_TOKEN: ${{ secrets.RESULTS_TOKEN }}
         run: |
           set -euo pipefail
-          # Results repo + site URL come from college.json (per-college instance)
+          # Results repo + site URL come from college.json (per-college instance).
+          # Resolve BOTH up front while CWD is still the tooling repo — the final
+          # `cd ${RESULTS_DIR}` drops us into the results-repo clone, which has no
+          # college.json, so a late `require('./college.json')` throws MODULE_NOT_FOUND.
           RESULTS_SHORT="$(node -p "require('./college.json').resultsRepo")"
+          SITE_URL="$(node -p "require('./college.json').canonicalSiteUrl")"
           RESULTS_REPO="ThirstyHead/${RESULTS_SHORT}"
           echo "Publishing to ${RESULTS_REPO}"
           # The default GITHUB_TOKEN is scoped to THIS repo only and cannot push
@@ -85,5 +89,4 @@ jobs:
             git commit -m "audit: weekly run $(date -u +%Y-%m-%d)"
             git push origin HEAD:main
           fi
-          SITE_URL="$(node -p "require('./college.json').canonicalSiteUrl")"
           echo "Site: ${SITE_URL}"

@@ -38,7 +38,26 @@ async function auditPage(browser, url) {
   });
   const page = await context.newPage();
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    const status = response ? response.status() : null;
+    // Non-2xx responses (403 WAF block, 404, 5xx) are NOT the real page content.
+    // Auditing them would report axe findings on an error/WAF page and count the
+    // page as "audited." Record the status and skip analysis so the site builder
+    // can surface it as a caveat instead of silently miscounting it.
+    if (status != null && (status < 200 || status >= 400)) {
+      return {
+        url,
+        status,
+        title: null,
+        finalUrl: page.url(),
+        slug: slugFor(url),
+        blocked: true,
+        error: `HTTP ${status}`,
+        violations: [],
+        violationTotal: 0,
+        incomplete: [],
+      };
+    }
     // Give lazy hydration / SPAs a beat before analyzing (SPA false-negative guard)
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(1500);

@@ -86,8 +86,9 @@ function incompleteNodes(p) {
 
 function summarizeReport(report, reportFile) {
   const pages = report.pages || [];
+  const blocked = pages.filter((p) => p.blocked || (typeof p.status === 'number' && p.status >= 400));
+  const failed = pages.filter((p) => p.error && !blocked.includes(p));
   const ok = pages.filter((p) => !p.error);
-  const failed = pages.filter((p) => p.error);
   const bySeverity = { critical: 0, serious: 0, moderate: 0, minor: 0 };
   let total = 0;
   let needsReview = 0;
@@ -103,6 +104,8 @@ function summarizeReport(report, reportFile) {
     reportFile,
     pagesAudited: ok.length,
     pagesFailed: failed.length,
+    pagesBlocked: blocked.length,
+    cleanPages: ok.filter((p) => (p.violationTotal || 0) === 0).length,
     totalViolations: total,
     bySeverity,
     needsReview,
@@ -156,6 +159,13 @@ function pagesTable(report) {
   const pages = report.pages || [];
   const hasReports = !!(report.pagesHtml && Object.keys(report.pagesHtml).length);
   const rows = pages.map((p) => {
+    const isBlocked = p.blocked || (typeof p.status === 'number' && p.status >= 400);
+    if (isBlocked) {
+      return `    <tr class="caveat">
+      <td class="pg"><span class="caveat-err">${esc(p.url)} — <em>not audited: HTTP ${p.status} (WAF/404), excluded from results</em></span></td>
+      <td class="n">—</td><td class="n">—</td><td></td>
+    </tr>`;
+    }
     if (p.error) {
       return `    <tr>
       <td class="pg"><span class="err">${esc(p.url)} — <em>failed: ${esc(String(p.error).slice(0, 160))}</em></span></td>
@@ -177,6 +187,25 @@ function pagesTable(report) {
   <thead><tr><th class="pg">Page</th><th class="n">Violations</th><th class="n">Needs review</th><th>Report</th></tr></thead>
   <tbody>
 ${rows.join('\n')}
+  </tbody>
+</table>`;
+}
+
+function coverageCaveats(report) {
+  const pages = report.pages || [];
+  const blocked = pages.filter((p) => p.blocked || (typeof p.status === 'number' && p.status >= 400));
+  if (!blocked.length) return '';
+  const rows = blocked.map((p) => `
+    <tr><td class="pg"><a href="${esc(p.url)}" rel="noopener">${esc(p.url)}</a></td>
+      <td class="n"><span class="caveat-badge">HTTP ${esc(p.status)}</span></td>
+      <td class="count">Not audited — the page returned an HTTP error (often a WAF or 404) instead of real content, so it is excluded from the results above.</td></tr>`).join('');
+  return `
+<h2>Coverage caveats (${blocked.length} not audited)</h2>
+<p class="note">These pages returned an HTTP error during the run, so axe could not analyze real content. They are excluded from the violation counts above. A 403 usually means the site's WAF blocked the audit's IP; a 404 means the page may have moved or the link is stale.</p>
+<table class="pages">
+  <thead><tr><th class="pg">Page</th><th class="n">HTTP</th><th>Why</th></tr></thead>
+  <tbody>
+${rows}
   </tbody>
 </table>`;
 }
@@ -284,6 +313,8 @@ function renderSite({ latest, history, args, report }) {
   footer { margin-top: 2.5rem; border-top: 1px solid #e3e7ea; padding-top: 1rem; font-size: .85rem; color: #566573; }
   footer a { color: #2e86c1; }
   .datamenu { display: flex; flex-wrap: wrap; gap: 1rem; margin: .5rem 0; }
+  table.pages tr.caveat td.pg .caveat-err { color: #b9770e; word-break: break-all; }
+  .caveat-badge { background: #fef9f3; color: #b9770e; border: 1px solid #f0b27a; padding: .1rem .4rem; border-radius: 4px; font-weight: 600; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -304,6 +335,7 @@ function renderSite({ latest, history, args, report }) {
   <div class="card"><span class="num">${latest.totalViolations}</span><span class="lbl">Node-level violations</span></div>
   <div class="card"><span class="num">${latest.pagesAudited}</span><span class="lbl">Pages audited</span></div>
   <div class="card"><span class="num">${latest.needsReview}</span><span class="lbl">Need manual review</span></div>
+  <div class="card"><span class="num ${latest.pagesBlocked ? 'warn' : ''}">${latest.pagesBlocked ?? 0}</span><span class="lbl">Not audited (HTTP error)</span></div>
 </div>
 <div class="severities">${sevCards}</div>
 
@@ -313,6 +345,7 @@ ${svg ? `<div>${svg}</div>` : '<p class="count">The trend chart appears once at 
 <h2>Pages</h2>
 <p class="note">Every page audited in this run. “Audit report” opens that page's full axe report — violations, needs-review, and passes, with node-level detail.</p>
 ${pagesTable(report)}
+${coverageCaveats(report)}
 
 <h2>Data</h2>
 <div class="datamenu">

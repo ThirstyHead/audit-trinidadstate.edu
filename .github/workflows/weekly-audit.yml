@@ -66,7 +66,18 @@ jobs:
           git clone "https://x-access-token:${RESULTS_TOKEN}@github.com/${RESULTS_REPO}.git" "${RESULTS_DIR}"
 
           # Newest report produced by this run
-          REPORT="$(ls -t audit/reports/axe-*.json | head -n 1)"
+          REPORT="$(ls -t audit/reports/axe-*.json 2>/dev/null | head -n 1 || true)"
+          if [ -z "${REPORT}" ]; then
+            echo "::error::No audit report produced — nothing to publish."
+            exit 1
+          fi
+          # Advisory guard: if EVERY page was blocked (WAF/404/captcha wall),
+          # publishing would replace the last good report with "0 audited".
+          # Log loudly and SKIP the publish; the previous results stay live.
+          if node -e 'const r=require(process.argv[1]); const p=r.pages||[]; const ok=p.filter(x=>!x.blocked&&!x.error).length; if(!p.length||!ok){ process.stdout.write(`ALL-BLOCKED ${ok}/${p.length}\n`); process.exit(3);} ' "${REPORT}"; then :; else
+            echo "::warning::Audit blocked every page (WAF/404/captcha) — SKIPPING publish so the previous good report stays live. Re-run when the site is reachable."
+            exit 0
+          fi
           echo "Publishing $(basename "${REPORT}")"
           mkdir -p "${RESULTS_DIR}/reports"
           cp "${REPORT}" "${RESULTS_DIR}/reports/$(basename "${REPORT}")"

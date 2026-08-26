@@ -104,6 +104,11 @@ function printSummary(pages) {
   const allRules = new Map();
   for (const p of pages) {
     console.log(`\n## ${p.url}${p.title ? ` — "${p.title}"` : ''}`);
+    if (p.blocked || p.error) {
+      if (p.blocked) console.log(`  SKIP — not audited (HTTP ${p.status})`);
+      else console.log(`  SKIP — not audited (load failed: ${String(p.error).slice(0, 80)})`);
+      continue;
+    }
     if (p.violations.length === 0) {
       console.log('  No axe violations found.');
       continue;
@@ -160,7 +165,17 @@ for (const url of targetUrls) {
   try {
     pages.push(await auditPage(browser, url));
   } catch (e) {
-    pages.push({ url, error: String(e) });
+    pages.push({
+      url,
+      status: null,
+      title: null,
+      finalUrl: url,
+      slug: slugFor(url),
+      error: String(e),
+      violations: [],
+      violationTotal: 0,
+      incomplete: [],
+    });
     console.error(`  FAILED: ${e}`);
   }
 }

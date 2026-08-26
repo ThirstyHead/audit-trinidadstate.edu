@@ -39,11 +39,14 @@ import config from '../audit/config.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOOLS_REPO = config.toolsRepoUrl;
 
+// Severity colors follow the CCCS brand (see :root in renderSite). Critical
+// maps to CCCS navy, serious to the brand orange, moderate to a dark amber
+// (AA on white), minor to CCCS gray-blue.
 const SEVERITY_META = [
-  ['critical', '#b03a2e', 'Critical'],
-  ['serious', '#ca6f1e', 'Serious'],
-  ['moderate', '#b7950b', 'Moderate'],
-  ['minor', '#707b7c', 'Minor'],
+  ['critical', '#03202F', 'Critical'],
+  ['serious', '#D74026', 'Serious'],
+  ['moderate', '#7A5200', 'Moderate'],
+  ['minor', '#394A58', 'Minor'],
 ];
 
 // ---------- args ----------
@@ -135,7 +138,7 @@ function sparkline(series) {
   const dots = series
     .map(
       (p, i) =>
-        `<circle cx="${x(i).toFixed(1)}" cy="${y(p.totalViolations).toFixed(1)}" r="4" fill="#2c3e50">
+        `<circle cx="${x(i).toFixed(1)}" cy="${y(p.totalViolations).toFixed(1)}" r="4" fill="${i === series.length - 1 ? '#D74026' : '#004165'}">
          <title>${esc(p.generated)} — ${p.totalViolations} node-level violations</title>
        </circle>`,
     )
@@ -144,7 +147,7 @@ function sparkline(series) {
   const dN = esc(series[series.length - 1].generated.slice(0, 10));
   return `
     <svg viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="Trend of total node-level violations across audit runs">
-      <polyline points="${pts}" fill="none" stroke="#2c3e50" stroke-width="2.5" stroke-linejoin="round"/>
+      <polyline points="${pts}" fill="none" stroke="#004165" stroke-width="2.5" stroke-linejoin="round"/>
       ${dots}
       <text x="${padX}" y="${h - 8}" class="axis">${d0}</text>
       <text x="${w - padX}" y="${h - 8}" class="axis" text-anchor="end">${dN}</text>
@@ -251,78 +254,110 @@ function renderSite({ latest, history, args, report }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WCAG 2.1 AA Audit — ${esc(siteName)} (${esc(siteUrl)})</title>
 <meta name="description" content="Automated weekly WCAG 2.1 AA accessibility audit results for ${esc(siteUrl)}, produced with axe-core.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: light;
+    /* CCCS brand palette (source: cccs.edu theme --wp--preset--color--*) */
+    --cccs-blue: #004165;
+    --cccs-navy: #03202F;
+    --cccs-gray-blue: #394A58;
+    --cccs-yellow: #FFCB4F;
+    --cccs-tan: #D7D3C7;
+    --cccs-soft-yellow: #FADD80;
+    --cccs-turquoise: #03738C;
+    --cccs-orange: #D74026;
+    --bg: #ffffff;
+    --text: #394A58;
+    --text-strong: #03202F;
+    --text-muted: #566573;
+    --text-faint: #7B8A8B;
+    --link: #004165;
+    --border: #e3e1da;
+    --row-head: #eff2f4;
+  }
   * { box-sizing: border-box; }
   body {
-    margin: 0 auto; padding: 2rem 1.25rem 4rem; max-width: 940px;
-    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #212f3c; background: #fdfdfc;
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
-  header h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
-  header .sub { color: #566573; margin: 0 0 1rem; }
-  .meta { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; color: #566573; font-size: .92rem; border-bottom: 1px solid #e3e7ea; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  /* header band mirrors the cccs.edu site header: blue -> navy, yellow rule */
+  .site-header { background: linear-gradient(to right, var(--cccs-blue), var(--cccs-navy));
+                 border-bottom: 5px solid var(--cccs-yellow); padding: 2rem 1.25rem; }
+  .site-header h1 { font-size: 1.7rem; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: .02em; color: #fff; margin: 0 0 .3rem; }
+  .site-header .sub { color: rgba(255,255,255,.85); margin: 0; font-weight: 500; }
+  .site-header .sub a { color: var(--cccs-yellow); font-weight: 600; }
+  .meta { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; color: var(--text-muted); font-size: .92rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem; }
+  .meta a { color: var(--link); font-weight: 600; }
+  a { color: var(--link); font-weight: 600; text-decoration: none; }
+  a:hover { text-decoration: underline; text-decoration-color: var(--cccs-yellow); text-decoration-thickness: 2px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
-  .card { background: #fff; border: 1px solid #e3e7ea; border-radius: 8px; padding: .9rem 1rem; }
-  .card .num { display: block; font-size: 1.9rem; font-weight: 700; line-height: 1.2; }
-  .card .lbl { color: #566573; font-size: .85rem; }
-  .sevcard { background: #fff; border: 1px solid #e3e7ea; border-radius: 8px; padding: .6rem .8rem; display: flex; align-items: baseline; gap: .5rem; }
-  .sevcard .num { font-size: 1.4rem; font-weight: 700; }
-  .sevcard .lbl { color: #566573; font-size: .82rem; }
+  .card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--cccs-turquoise); border-radius: 6px; padding: .9rem 1rem; }
+  .card .num { display: block; font-size: 1.9rem; font-weight: 700; line-height: 1.2; color: var(--text-strong); }
+  .card .lbl { color: var(--text-muted); font-size: .85rem; }
+  .sevcard { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: .6rem .8rem; display: flex; align-items: baseline; gap: .5rem; }
+  .sevcard .num { font-size: 1.4rem; font-weight: 700; color: var(--text-strong); }
+  .sevcard .lbl { color: var(--text-muted); font-size: .82rem; }
   .severities { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .5rem; margin-bottom: 1.5rem; }
-  h2 { font-size: 1.2rem; margin: 2rem 0 .75rem; }
-  .spark { width: 100%; max-width: 680px; height: auto; background: #fff; border: 1px solid #e3e7ea; border-radius: 8px; }
-  .axis { font-size: 11px; fill: #7b8a8b; }
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 2rem 0 .75rem; color: var(--text-strong); }
+  .spark { width: 100%; max-width: 680px; height: auto; background: #fff; border: 1px solid var(--border); border-radius: 6px; }
+  .axis { font-size: 11px; fill: var(--text-muted); }
   .delta { font-size: .9rem; font-weight: 600; }
-  .delta.up { color: #b03a2e; } .delta.down { color: #1e8449; }
-  .delta.flat, .delta.first { color: #7b8a8b; font-weight: 400; }
-  .page { background: #fff; border: 1px solid #e3e7ea; border-radius: 8px; padding: 1rem 1.25rem 1.25rem; margin-bottom: 1rem; }
+  .delta.up { color: var(--cccs-orange); } .delta.down { color: #1E8449; }
+  .delta.flat, .delta.first { color: var(--text-muted); font-weight: 500; }
+  .page { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem 1.25rem; margin-bottom: 1rem; }
   .page.failed { border-color: #f0b27a; background: #fef9f3; }
-  .page h3 { margin: 0 0 .25rem; font-size: 1.05rem; word-break: break-all; }
-  .page h3 .title { font-weight: 400; color: #7b8a8b; font-size: .9rem; }
-  .page h4 { margin: 1rem 0 .5rem; font-size: .95rem; }
-  .count { color: #7b8a8b; font-weight: 400; font-size: .85rem; }
-  .total { margin: 0 0 .5rem; color: #566573; }
-  .clean { color: #1e8449; font-weight: 600; }
-  .warn { color: #b9770e; }
+  .page h3 { margin: 0 0 .25rem; font-size: 1.05rem; word-break: break-all; color: var(--text-strong); }
+  .page h3 .title { font-weight: 400; color: var(--text-faint); font-size: .9rem; }
+  .page h4 { margin: 1rem 0 .5rem; font-size: .95rem; color: var(--text-strong); }
+  .count { color: var(--text-faint); font-weight: 500; font-size: .85rem; }
+  .total { margin: 0 0 .5rem; color: var(--text-muted); }
+  .clean { color: #1E8449; font-weight: 600; }
+  .warn { color: var(--cccs-orange); font-weight: 600; }
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #eef1f2; vertical-align: top; }
-  th { color: #566573; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
-  .targets { color: #7b8a8b; font-size: .82rem; word-break: break-all; max-width: 260px; }
-  code { background: #f4f6f7; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+  th { color: var(--text); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+  .targets { color: var(--text-faint); font-size: .82rem; word-break: break-all; max-width: 260px; }
+  code { background: #f0f2f4; color: var(--text); padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
   ul.inc { margin: .25rem 0 0; padding-left: 1.2rem; }
-  .note { color: #566573; font-size: .9rem; margin: .25rem 0 .75rem; }
-  table.pages { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .note { color: var(--text-muted); font-size: .9rem; margin: .25rem 0 .75rem; }
+  table.pages { width: 100%; border-collapse: collapse; font-size: .9rem; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   table.pages thead th {
-    position: sticky; top: 0; background: #fdfdfc; z-index: 1;
-    border-bottom: 2px solid #e3e7ea;
+    position: sticky; top: 0; background: var(--row-head); z-index: 1;
+    border-bottom: 2px solid var(--border);
   }
   table.pages th.n, table.pages td.n { text-align: right; white-space: nowrap; }
-  table.pages td.n.bad { color: #b03a2e; font-weight: 700; }
+  table.pages td.n.bad { color: var(--cccs-orange); font-weight: 700; }
   table.pages td.pg { max-width: 0; }
   table.pages td.pg a { word-break: break-all; }
-  table.pages .pwurl { display: block; color: #7b8a8b; font-size: .8rem; margin-top: .1rem; word-break: break-all; }
+  table.pages .pwurl { display: block; color: var(--text-faint); font-size: .8rem; margin-top: .1rem; word-break: break-all; }
   table.pages td.pg .err { word-break: break-all; }
   table.pages td.links { white-space: nowrap; text-align: right; }
   table.pages a.pgrep {
-    color: #2e86c1; text-decoration: none; font-weight: 600;
-    border: 1px solid #cfe6f5; background: #f4fafd; padding: .15rem .5rem; border-radius: 6px;
+    color: var(--cccs-blue); font-weight: 600;
+    border: 1px solid #cfe6f5; background: #eff6f9; padding: .15rem .5rem; border-radius: 6px;
   }
-  table.pages a.pgrep:hover { background: #e8f4fb; }
-  table.pages tr.bad td.pg a { color: #b03a2e; }
-  footer { margin-top: 2.5rem; border-top: 1px solid #e3e7ea; padding-top: 1rem; font-size: .85rem; color: #566573; }
-  footer a { color: #2e86c1; }
+  table.pages a.pgrep:hover { background: #dcebf1; }
+  table.pages tr.bad td.pg a { color: var(--cccs-orange); }
+  /* footer band mirrors the cccs.edu footer: tan background, navy text */
+  footer { margin-top: 2.5rem; background: var(--cccs-tan); color: var(--cccs-navy);
+           border-top: 5px solid var(--cccs-yellow); padding: 1.5rem 1.25rem; font-size: .85rem; }
+  footer a { color: var(--cccs-blue); font-weight: 600; }
   .datamenu { display: flex; flex-wrap: wrap; gap: 1rem; margin: .5rem 0; }
-  table.pages tr.caveat td.pg .caveat-err { color: #b9770e; word-break: break-all; }
-  .caveat-badge { background: #fef9f3; color: #b9770e; border: 1px solid #f0b27a; padding: .1rem .4rem; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+  table.pages tr.caveat td.pg .caveat-err { color: #7A5200; word-break: break-all; }
+  .caveat-badge { background: #fff6e5; color: #7A5200; border: 1px solid #f0d9a8; padding: .1rem .4rem; border-radius: 4px; font-weight: 600; white-space: nowrap; }
 </style>
 </head>
 <body>
-<header>
+<header class="site-header">
   <h1>WCAG 2.1 AA Audit — ${esc(siteName)}</h1>
   <p class="sub"><a href="${esc(siteUrl)}">${esc(siteUrl)}</a></p>
 </header>
-
+<div class="wrap">
 <div class="meta">
   <span>Last audited: <strong>${latestDate}</strong> (UTC)</span>
   <span>Published runs: ${history.length}</span>
@@ -354,7 +389,7 @@ ${coverageCaveats(report)}
   <a href="${esc(rawBase)}/${esc(latest.reportFile)}">Raw report (latest)</a>
   <a href="${esc(config.resultsRepoUrl)}/tree/main/reports">All raw reports</a>
 </div>
-
+</div>
 <footer>
   <p><strong>About this audit.</strong> Results are produced automatically by
   <a href="https://github.com/dequelabs/axe-core">axe-core</a> (Deque) against the WCAG 2.1 A/AA rule set,

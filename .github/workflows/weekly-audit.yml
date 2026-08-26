@@ -74,7 +74,10 @@ jobs:
           # Advisory guard: if EVERY page was blocked (WAF/404/captcha wall),
           # publishing would replace the last good report with "0 audited".
           # Log loudly and SKIP the publish; the previous results stay live.
-          if node -e 'const r=require(process.argv[1]); const p=r.pages||[]; const ok=p.filter(x=>!x.blocked&&!x.error).length; if(!p.length||!ok){ process.stdout.write(`ALL-BLOCKED ${ok}/${p.length}\n`); process.exit(3);} ' "${REPORT}"; then :; else
+          # NOTE: readFileSync (CWD-relative), NOT require() — a path without a
+          # leading "./" is a bare module name and resolves via node_modules,
+          # so require would always MODULE_NOT_FOUND and false-positive the guard.
+          if node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); const p=r.pages||[]; const ok=p.filter(x=>!x.blocked&&!x.error).length; if(!p.length||!ok){ process.stdout.write(`ALL-BLOCKED ${ok}/${p.length}\n`); process.exit(3);} ' "${REPORT}"; then :; else
             echo "::warning::Audit blocked every page (WAF/404/captcha) — SKIPPING publish so the previous good report stays live. Re-run when the site is reachable."
             exit 0
           fi
